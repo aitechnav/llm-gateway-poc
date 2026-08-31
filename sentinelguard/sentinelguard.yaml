@@ -1,0 +1,59 @@
+mode: standard
+fail_fast: false
+parallel: true
+max_workers: 4
+model_warmup: false
+log_level: INFO
+prompt_scanners:
+  prompt_injection:
+    enabled: true
+    threshold: 0.5
+    params: {}
+    on_fail: block
+  jailbreak:
+    enabled: true
+    threshold: 0.4
+    params: {}
+    on_fail: block
+  pii:
+    enabled: true
+    threshold: 0.5
+    params: {}
+    on_fail: sanitize
+  secrets:
+    enabled: true
+    threshold: 0.5
+    params: {}
+    on_fail: block
+  invisible_text:
+    enabled: true
+    threshold: 0.1
+    params: {}
+    on_fail: block
+  token_limit:
+    enabled: true
+    threshold: 0.5
+    params:
+      max_tokens: 4096
+    on_fail: block
+output_scanners:
+  data_leakage:
+    enabled: true
+    threshold: 0.5
+    params: {}
+    on_fail: block
+  pii:
+    enabled: true
+    threshold: 0.5
+    params: {}
+    on_fail: sanitize
+  secrets:
+    enabled: true
+    threshold: 0.5
+    params: {}
+    on_fail: block
+  system_prompt_leakage:
+    enabled: true
+    threshold: 0.4
+    params: {}
+    on_fail: block

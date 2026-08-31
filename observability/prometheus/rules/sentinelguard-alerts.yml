@@ -1,0 +1,72 @@
+groups:
+  - name: sentinelguard-demo
+    rules:
+      - alert: SentinelGuardPromptAttackDetected
+        expr: sum(increase(sentinelguard_detections_total{category="attack"}[2m])) > 0
+        for: 0m
+        labels:
+          severity: warning
+          category: attack
+        annotations:
+          summary: SentinelGuard detected a prompt attack
+          description: Prompt attack scanner detections increased in the last 2 minutes.
+
+      - alert: SentinelGuardSecretDetected
+        expr: sum(increase(sentinelguard_detections_total{category="secret"}[2m])) > 0
+        for: 0m
+        labels:
+          severity: critical
+          category: secret
+        annotations:
+          summary: SentinelGuard detected a secret or credential
+          description: Secret scanner detections increased in the last 2 minutes.
+
+      - alert: SentinelGuardPIIDetected
+        expr: sum(increase(sentinelguard_detections_total{category="pii"}[2m])) > 0
+        for: 0m
+        labels:
+          severity: warning
+          category: pii
+        annotations:
+          summary: SentinelGuard detected PII
+          description: PII detections increased in the last 2 minutes.
+
+      - alert: SentinelGuardProviderFailover
+        expr: sum(increase(sentinelguard_provider_failovers_total[2m])) > 0
+        for: 0m
+        labels:
+          severity: warning
+          category: provider
+        annotations:
+          summary: SentinelGuard used provider failover
+          description: One or more upstream provider failovers happened in the last 2 minutes.
+
+      - alert: SentinelGuardUpstreamErrors
+        expr: sum(increase(sentinelguard_provider_attempts_total{result!="success"}[5m])) > 2
+        for: 1m
+        labels:
+          severity: warning
+          category: provider
+        annotations:
+          summary: SentinelGuard upstream provider errors are increasing
+          description: Provider attempts with non-success results exceeded the demo threshold.
+
+      - alert: SentinelGuardHighScanLatency
+        expr: histogram_quantile(0.95, sum by (le, direction) (rate(sentinelguard_scan_latency_seconds_bucket[5m]))) > 1
+        for: 2m
+        labels:
+          severity: warning
+          category: latency
+        annotations:
+          summary: SentinelGuard scan latency is high
+          description: p95 scanner latency exceeded 1 second for at least 2 minutes.
+
+      - alert: ChatbotGatewayErrors
+        expr: sum(increase(chatbot_requests_total{outcome=~"gateway_error|gateway_unreachable|auth_error"}[5m])) > 2
+        for: 1m
+        labels:
+          severity: warning
+          category: chatbot
+        annotations:
+          summary: Chatbot is seeing gateway errors
+          description: Chatbot requests to SentinelGuard are failing or being rejected.
