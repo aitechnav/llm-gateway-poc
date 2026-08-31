@@ -1,0 +1,191 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: sentinelguard-config
+data:
+  sentinelguard.yaml: |
+    mode: standard
+    fail_fast: false
+    parallel: true
+    max_workers: 4
+    model_warmup: false
+    log_level: INFO
+    prompt_scanners:
+      prompt_injection:
+        enabled: true
+        threshold: 0.5
+        params: {}
+        on_fail: block
+      jailbreak:
+        enabled: true
+        threshold: 0.4
+        params: {}
+        on_fail: block
+      pii:
+        enabled: true
+        threshold: 0.5
+        params: {}
+        on_fail: sanitize
+      secrets:
+        enabled: true
+        threshold: 0.5
+        params: {}
+        on_fail: block
+      invisible_text:
+        enabled: true
+        threshold: 0.1
+        params: {}
+        on_fail: block
+      token_limit:
+        enabled: true
+        threshold: 0.5
+        params:
+          max_tokens: 4096
+        on_fail: block
+    output_scanners:
+      data_leakage:
+        enabled: true
+        threshold: 0.5
+        params: {}
+        on_fail: block
+      pii:
+        enabled: true
+        threshold: 0.5
+        params: {}
+        on_fail: sanitize
+      secrets:
+        enabled: true
+        threshold: 0.5
+        params: {}
+        on_fail: block
+      system_prompt_leakage:
+        enabled: true
+        threshold: 0.4
+        params: {}
+        on_fail: block
+
+  gateway.yaml: |
+    gateway:
+      enabled: true
+      provider: openai-compatible
+      upstream_url: http://mock-llm-primary:8001/v1
+      api_key_env: OPENAI_API_KEY
+      client_api_key_env: SENTINELGUARD_GATEWAY_API_KEY
+      forward_authorization: false
+
+      block_on_prompt_fail: true
+      block_on_output_fail: true
+      sanitize: true
+      redact_pii: true
+      redact_output_pii: true
+      route_pii_to_private_provider: true
+
+      fallback_enabled: true
+      routing_strategy: priority
+      complexity_router:
+        enabled: true
+        strategy: rule-based
+        auto_model_names:
+          - sentinel-auto
+          - auto
+        simple_model: fast-chat
+        complex_model: smart-chat
+        private_model: private-chat
+        preserve_explicit_model: true
+        complexity_threshold: 0.65
+      health_check_enabled: true
+      unhealthy_ttl_seconds: 10
+      failover_status_codes: [408, 409, 425, 429, 500, 502, 503, 504]
+      timeout_seconds: 30
+      default_max_tokens: 512
+      streaming_mode: buffered
+
+      state_backend: memory
+      cache_enabled: false
+      cache_backend: memory
+
+      metrics_enabled: true
+      audit_enabled: true
+      audit_hash_salt_env: SENTINELGUARD_AUDIT_SALT
+      admin_ui_enabled: true
+      otel_enabled: false
+      langfuse_enabled: false
+
+      virtual_keys:
+        - name: demo-chatbot
+          key_env: SENTINELGUARD_GATEWAY_API_KEY
+          tenant_id: demo
+          team_id: sre
+          allowed_models:
+            - sentinel-auto
+            - fast-chat
+            - smart-chat
+            - private-chat
+          max_requests: 10000
+          max_tokens: 5000000
+          max_budget: 100.0
+          budget_reset: daily
+
+      providers:
+        - name: mock-fast-primary
+          provider: openai-compatible
+          model_name: fast-chat
+          upstream_model: mock-fast
+          upstream_url: http://mock-llm-primary:8001/v1
+          api_key_env: OPENAI_API_KEY
+          private: false
+          priority: 10
+          weight: 1
+          input_cost_per_token: 0.0000001
+          output_cost_per_token: 0.0000002
+          max_parallel_requests: 100
+
+        - name: mock-fast-backup
+          provider: openai-compatible
+          model_name: fast-chat
+          upstream_model: mock-fast
+          upstream_url: http://mock-llm-backup:8001/v1
+          api_key_env: OPENAI_API_KEY
+          private: false
+          priority: 20
+          weight: 1
+          input_cost_per_token: 0.0000001
+          output_cost_per_token: 0.0000002
+          max_parallel_requests: 100
+
+        - name: mock-smart-primary
+          provider: openai-compatible
+          model_name: smart-chat
+          upstream_model: mock-smart
+          upstream_url: http://mock-llm-primary:8001/v1
+          api_key_env: OPENAI_API_KEY
+          private: false
+          priority: 10
+          weight: 1
+          input_cost_per_token: 0.000001
+          output_cost_per_token: 0.000002
+          max_parallel_requests: 80
+
+        - name: mock-smart-backup
+          provider: openai-compatible
+          model_name: smart-chat
+          upstream_model: mock-smart
+          upstream_url: http://mock-llm-backup:8001/v1
+          api_key_env: OPENAI_API_KEY
+          private: false
+          priority: 20
+          weight: 1
+          input_cost_per_token: 0.000001
+          output_cost_per_token: 0.000002
+          max_parallel_requests: 80
+
+        - name: mock-private
+          provider: openai-compatible
+          model_name: private-chat
+          upstream_model: mock-private
+          upstream_url: http://mock-llm-backup:8001/v1
+          api_key_env: OPENAI_API_KEY
+          private: true
+          priority: 5
+          weight: 1
+          max_parallel_requests: 40

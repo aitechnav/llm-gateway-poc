@@ -1,0 +1,124 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mock-llm-primary
+  labels:
+    app.kubernetes.io/name: mock-llm-primary
+    app.kubernetes.io/component: mock-provider
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mock-llm-primary
+  template:
+    metadata:
+      labels:
+        app: mock-llm-primary
+        app.kubernetes.io/name: mock-llm-primary
+        app.kubernetes.io/component: mock-provider
+    spec:
+      containers:
+        - name: mock-llm
+          image: llm-gateway-poc-mock-llm:local
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: PROVIDER_NAME
+              value: mock-primary
+            - name: FAIL_ON_TRIGGER
+              value: "true"
+          ports:
+            - name: http
+              containerPort: 8001
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mock-llm-primary
+  labels:
+    app.kubernetes.io/name: mock-llm-primary
+    app.kubernetes.io/component: mock-provider
+spec:
+  selector:
+    app: mock-llm-primary
+  ports:
+    - name: http
+      port: 8001
+      targetPort: http
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mock-llm-backup
+  labels:
+    app.kubernetes.io/name: mock-llm-backup
+    app.kubernetes.io/component: mock-provider
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mock-llm-backup
+  template:
+    metadata:
+      labels:
+        app: mock-llm-backup
+        app.kubernetes.io/name: mock-llm-backup
+        app.kubernetes.io/component: mock-provider
+    spec:
+      containers:
+        - name: mock-llm
+          image: llm-gateway-poc-mock-llm:local
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: PROVIDER_NAME
+              value: mock-backup
+            - name: FAIL_ON_TRIGGER
+              value: "false"
+          ports:
+            - name: http
+              containerPort: 8001
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mock-llm-backup
+  labels:
+    app.kubernetes.io/name: mock-llm-backup
+    app.kubernetes.io/component: mock-provider
+spec:
+  selector:
+    app: mock-llm-backup
+  ports:
+    - name: http
+      port: 8001
+      targetPort: http
+

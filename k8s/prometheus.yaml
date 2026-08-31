@@ -1,0 +1,169 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: prometheus-config
+data:
+  prometheus.yml: |
+    global:
+      scrape_interval: 10s
+      evaluation_interval: 10s
+
+    alerting:
+      alertmanagers:
+        - static_configs:
+            - targets:
+                - alertmanager:9093
+
+    rule_files:
+      - /etc/prometheus/sentinelguard-alerts.yml
+
+    scrape_configs:
+      - job_name: sentinelguard
+        metrics_path: /metrics
+        static_configs:
+          - targets:
+              - sentinelguard:8080
+
+      - job_name: chatbot
+        metrics_path: /metrics
+        static_configs:
+          - targets:
+              - chatbot:3000
+
+      - job_name: prometheus
+        static_configs:
+          - targets:
+              - prometheus:9090
+
+  sentinelguard-alerts.yml: |
+    groups:
+      - name: sentinelguard-security
+        rules:
+          - alert: SentinelGuardPromptAttackDetected
+            expr: sum(increase(sentinelguard_detections_total{category="attack"}[2m])) > 0
+            for: 0m
+            labels:
+              severity: warning
+              category: attack
+            annotations:
+              summary: SentinelGuard detected a prompt attack.
+              description: One or more prompt attack scanners fired in the last 2 minutes.
+
+          - alert: SentinelGuardSecretDetected
+            expr: sum(increase(sentinelguard_detections_total{category="secret"}[2m])) > 0
+            for: 0m
+            labels:
+              severity: critical
+              category: secret
+            annotations:
+              summary: SentinelGuard detected a secret or credential.
+              description: A secret scanner fired in the last 2 minutes.
+
+          - alert: SentinelGuardPIIDetected
+            expr: sum(increase(sentinelguard_detections_total{category="pii"}[2m])) > 0
+            for: 0m
+            labels:
+              severity: warning
+              category: pii
+            annotations:
+              summary: SentinelGuard detected PII.
+              description: A PII scanner fired in the last 2 minutes.
+
+          - alert: SentinelGuardProviderFailover
+            expr: sum(increase(sentinelguard_provider_failovers_total[2m])) > 0
+            for: 0m
+            labels:
+              severity: warning
+              category: routing
+            annotations:
+              summary: SentinelGuard used provider failover.
+              description: Traffic moved from one upstream model provider to another.
+
+          - alert: SentinelGuardUpstreamErrors
+            expr: sum(increase(sentinelguard_provider_attempts_total{result!="success"}[5m])) > 2
+            for: 1m
+            labels:
+              severity: warning
+              category: provider
+            annotations:
+              summary: SentinelGuard is seeing repeated provider errors.
+              description: More than two upstream provider attempts failed in five minutes.
+
+          - alert: SentinelGuardHighScanLatency
+            expr: histogram_quantile(0.95, sum by (le, direction) (rate(sentinelguard_scan_latency_seconds_bucket[5m]))) > 1
+            for: 2m
+            labels:
+              severity: warning
+              category: latency
+            annotations:
+              summary: SentinelGuard scan latency is elevated.
+              description: P95 scanner latency is above 1 second.
+
+          - alert: ChatbotGatewayErrors
+            expr: sum(increase(chatbot_requests_total{outcome=~"gateway_error|gateway_unreachable|auth_error"}[5m])) > 2
+            for: 1m
+            labels:
+              severity: warning
+              category: app
+            annotations:
+              summary: Chatbot is seeing SentinelGuard gateway errors.
+              description: The demo app reported repeated gateway errors in five minutes.
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: prometheus
+  labels:
+    app.kubernetes.io/name: prometheus
+    app.kubernetes.io/component: observability
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: prometheus
+  template:
+    metadata:
+      labels:
+        app: prometheus
+        app.kubernetes.io/name: prometheus
+        app.kubernetes.io/component: observability
+    spec:
+      containers:
+        - name: prometheus
+          image: prom/prometheus:v2.54.1
+          args:
+            - --config.file=/etc/prometheus/prometheus.yml
+            - --web.enable-lifecycle
+          ports:
+            - name: http
+              containerPort: 9090
+          volumeMounts:
+            - name: prometheus-config
+              mountPath: /etc/prometheus
+              readOnly: true
+          resources:
+            requests:
+              cpu: 100m
+              memory: 256Mi
+            limits:
+              cpu: 750m
+              memory: 1Gi
+      volumes:
+        - name: prometheus-config
+          configMap:
+            name: prometheus-config
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: prometheus
+  labels:
+    app.kubernetes.io/name: prometheus
+    app.kubernetes.io/component: observability
+spec:
+  selector:
+    app: prometheus
+  ports:
+    - name: http
+      port: 9090
+      targetPort: http

@@ -1,0 +1,72 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: chatbot
+  labels:
+    app.kubernetes.io/name: chatbot
+    app.kubernetes.io/component: web
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: chatbot
+  template:
+    metadata:
+      labels:
+        app: chatbot
+        app.kubernetes.io/name: chatbot
+        app.kubernetes.io/component: web
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/path: /metrics
+        prometheus.io/port: "3000"
+    spec:
+      containers:
+        - name: chatbot
+          image: llm-gateway-poc-chatbot:local
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: SENTINELGUARD_BASE_URL
+              value: http://sentinelguard:8080/v1
+            - name: SENTINELGUARD_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: sentinelguard-secrets
+                  key: SENTINELGUARD_GATEWAY_API_KEY
+            - name: CHAT_MODEL
+              value: sentinel-auto
+            - name: REQUEST_TIMEOUT_SECONDS
+              value: "90"
+          ports:
+            - name: http
+              containerPort: 3000
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: chatbot
+  labels:
+    app.kubernetes.io/name: chatbot
+    app.kubernetes.io/component: web
+spec:
+  selector:
+    app: chatbot
+  ports:
+    - name: http
+      port: 3000
+      targetPort: http

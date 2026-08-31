@@ -75,6 +75,7 @@ async function sendPrompt(prompt) {
     const data = await response.json();
 
     if (!data.ok) {
+      conversation.pop();
       appendMessage("assistant", summarizeGatewayError(data), true);
       setStatus("Blocked", true);
       return;
@@ -85,6 +86,7 @@ async function sendPrompt(prompt) {
     appendMessage("assistant", answer);
     setStatus("Passed");
   } catch (error) {
+    conversation.pop();
     appendMessage("assistant", `Chatbot backend error: ${error.message}`, true);
     setStatus("Error", true);
   } finally {
