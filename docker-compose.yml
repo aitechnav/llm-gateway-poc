@@ -1,0 +1,117 @@
+services:
+  chatbot:
+    build:
+      context: ./chatbot
+    environment:
+      SENTINELGUARD_BASE_URL: http://sentinelguard:8080/v1
+      SENTINELGUARD_API_KEY: ${SENTINELGUARD_GATEWAY_API_KEY:-sgw_local_demo_token_change_me}
+      CHAT_MODEL: ${CHAT_MODEL:-sentinel-auto}
+      REQUEST_TIMEOUT_SECONDS: "90"
+    ports:
+      - "3000:3000"
+    depends_on:
+      sentinelguard:
+        condition: service_healthy
+
+  sentinelguard:
+    image: ${SENTINELGUARD_IMAGE:-aitechnav/sentinelguard:0.0.10}
+    environment:
+      SENTINELGUARD_GATEWAY_API_KEY: ${SENTINELGUARD_GATEWAY_API_KEY:-sgw_local_demo_token_change_me}
+      SENTINELGUARD_AUDIT_SALT: ${SENTINELGUARD_AUDIT_SALT:-sgaudit_local_demo_salt_change_me}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-mock-provider-key}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY:-}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      MOONSHOT_API_KEY: ${MOONSHOT_API_KEY:-}
+      KIMI_API_KEY: ${KIMI_API_KEY:-}
+      MISTRAL_API_KEY: ${MISTRAL_API_KEY:-}
+      MINIMAX_API_KEY: ${MINIMAX_API_KEY:-}
+      HF_TOKEN: ${HF_TOKEN:-}
+      HUGGINGFACE_API_KEY: ${HUGGINGFACE_API_KEY:-}
+      OLLAMA_API_KEY: ${OLLAMA_API_KEY:-}
+    command:
+      - gateway
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8080"
+      - --config
+      - /etc/sentinelguard/sentinelguard.yaml
+      - --gateway-config
+      - /etc/sentinelguard/gateway.yaml
+    volumes:
+      - ./sentinelguard/sentinelguard.yaml:/etc/sentinelguard/sentinelguard.yaml:ro
+      - ./sentinelguard/gateway.yaml:/etc/sentinelguard/gateway.yaml:ro
+    ports:
+      - "8080:8080"
+    depends_on:
+      mock-llm-primary:
+        condition: service_started
+      mock-llm-backup:
+        condition: service_started
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/gateway/v1/health', timeout=3)"
+      interval: 10s
+      timeout: 5s
+      retries: 12
+
+  mock-llm-primary:
+    build:
+      context: ./mock-llm
+    environment:
+      PROVIDER_NAME: mock-primary
+      FAIL_ON_TRIGGER: "true"
+    expose:
+      - "8001"
+
+  mock-llm-backup:
+    build:
+      context: ./mock-llm
+    environment:
+      PROVIDER_NAME: mock-backup
+      FAIL_ON_TRIGGER: "false"
+    expose:
+      - "8001"
+
+  prometheus:
+    image: prom/prometheus:v2.54.1
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --web.enable-lifecycle
+    volumes:
+      - ./observability/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./observability/prometheus/rules:/etc/prometheus/rules:ro
+    ports:
+      - "9090:9090"
+    depends_on:
+      - sentinelguard
+      - chatbot
+      - alertmanager
+
+  alertmanager:
+    image: prom/alertmanager:v0.27.0
+    command:
+      - --config.file=/etc/alertmanager/alertmanager.yml
+    volumes:
+      - ./observability/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+    ports:
+      - "9093:9093"
+
+  grafana:
+    image: grafana/grafana:11.2.2
+    environment:
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-sentinelguard}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports:
+      - "3001:3000"
+    depends_on:
+      - prometheus
