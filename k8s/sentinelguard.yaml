@@ -23,7 +23,7 @@ spec:
     spec:
       containers:
         - name: sentinelguard
-          image: aitechnav/sentinelguard:0.0.10
+          image: aitechnav/sentinelguard:0.0.11
           imagePullPolicy: IfNotPresent
           args:
             - gateway
@@ -45,6 +45,8 @@ spec:
             - name: sentinelguard-config
               mountPath: /etc/sentinelguard
               readOnly: true
+            - name: sentinelguard-data
+              mountPath: /data
           readinessProbe:
             httpGet:
               path: /gateway/v1/health
@@ -68,6 +70,9 @@ spec:
         - name: sentinelguard-config
           configMap:
             name: sentinelguard-config
+        - name: sentinelguard-data
+          persistentVolumeClaim:
+            claimName: sentinelguard-data
 ---
 apiVersion: v1
 kind: Service

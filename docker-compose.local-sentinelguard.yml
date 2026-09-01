@@ -3,4 +3,4 @@ services:
     build:
       context: ../Sentinel_Guard
       dockerfile: Dockerfile
-    image: ${SENTINELGUARD_IMAGE:-aitechnav/sentinelguard:0.0.9}
+    image: ${SENTINELGUARD_IMAGE:-aitechnav/sentinelguard:0.0.11}

@@ -9,6 +9,7 @@ resources:
   - sentinelguard-config.yaml
   - mock-llm.yaml
   - sentinelguard.yaml
+  - sentinelguard-pvc.yaml
   - chatbot.yaml
   - alertmanager.yaml
   - prometheus.yaml

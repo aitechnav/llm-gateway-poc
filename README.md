@@ -180,7 +180,7 @@ image names in `k8s/chatbot.yaml` and `k8s/mock-llm.yaml`.
 The SentinelGuard image defaults to:
 
 ```text
-aitechnav/sentinelguard:0.0.10
+aitechnav/sentinelguard:0.0.11
 ```
 
 ## Using A Real LLM Provider
