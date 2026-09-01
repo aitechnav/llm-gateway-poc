@@ -100,14 +100,21 @@ data:
       default_max_tokens: 512
       streaming_mode: buffered
 
-      state_backend: memory
+      state_backend: sqlite
+      state_path: /data/sentinelguard_gateway.sqlite3
       cache_enabled: false
-      cache_backend: memory
+      cache_backend: sqlite
 
       metrics_enabled: true
       audit_enabled: true
       audit_hash_salt_env: SENTINELGUARD_AUDIT_SALT
       admin_ui_enabled: true
+      admin_auth_enabled: true
+      admin_state_path: /data/sentinelguard_gateway.sqlite3
+      admin_username_env: SENTINELGUARD_ADMIN_USERNAME
+      admin_password_env: SENTINELGUARD_ADMIN_PASSWORD
+      admin_viewer_username_env: SENTINELGUARD_VIEWER_USERNAME
+      admin_viewer_password_env: SENTINELGUARD_VIEWER_PASSWORD
       otel_enabled: false
       langfuse_enabled: false
 
